@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
+import {Skeleton} from "~/components/ui/skeleton";
 
 interface Message {
   role: "user" | "system";
@@ -36,36 +37,33 @@ export default function ChatPanel() {
         return;
       }
       const hisList: Array<any> = data.data;
-      hisList.reverse().forEach((item) => {
-        displayMsg(item);
-      });
+      const hisMsg: Array<Message> = [];
+      hisList.forEach((item) => {
+        hisMsg.push({role: item.role, content: item.message})
+      })
+      await displayMsg(hisMsg, true);
     } catch (e) {
-      setMessages((msgs) => [
-        ...msgs,
-        { role: "system", content: "网络异常，请稍后重试。" }
-      ]);
+      await displayMsg([{role: "system", content: "网络异常，请稍后重试。"}], true);
     }
   }
 
   // 消息展示
-  const displayMsg = (item: any) => {
-    const msg: string = item.message
-        let lines = msg.split("\$");
-        if (lines.length > 1) {
-          lines.forEach(line => {
-            if (!line.trim()) return;
-            setMessages((msgs) => [
-              ...msgs,
-              {role: item.role, content: line}
-            ]);
-          })
-        } else {
-          setMessages((msgs) => [
-            ...msgs,
-            {role: item.role, content: msg}
-          ]);
+  const displayMsg = async (msg_lst: Array<any>, is_his: boolean) => {
+    for (const item of msg_lst) {
+      const msg: string = item.content;
+      let lines = msg.split("$");
+      for (const line of lines) {
+        setLoading(true);
+        if (!line.trim()) continue;
+        if (!is_his) {
+          const delay = Math.min(5000, Math.max(1000, line.length * 100));
+          await sleep(delay);
         }
-  }
+        setMessages((msgs) => [...msgs, { role: item.role, content: line }]);
+        setLoading(false);
+      }
+    }
+  };
 
   // 发送消息
   const sendMessage = async () => {
@@ -81,17 +79,10 @@ export default function ChatPanel() {
         body: JSON.stringify({ user_input: input })
       });
       const data = await resp.json();
-      const sysMsg: Message = {
-        role: "system",
-        content: data?.data || "系统无响应"
-      };
-      setMessages((msgs) => [...msgs, sysMsg]);
+      await displayMsg([{ role: "system", content: data?.data || "系统无响应" }], false);
     } catch (e) {
       console.log("发送消息失败:", e);
-      setMessages((msgs) => [
-        ...msgs,
-        { role: "system", content: "网络异常，请稍后重试。" }
-      ]);
+      await displayMsg([{ role: "system", content: "网络异常，请稍后重试。" }], false);
     } finally {
       setLoading(false);
     }
@@ -101,6 +92,9 @@ export default function ChatPanel() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") sendMessage();
   };
+
+  // 等待，用于模拟真实聊天
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   return (
     <div className="w-full max-w-7xl flex flex-col h-[75vh] bg-card rounded-lg shadow p-4 border border-border">
@@ -125,6 +119,11 @@ export default function ChatPanel() {
             </div>
           </div>
         ))}
+        {loading && (
+          <div className="flex mb-3 justify-start">
+            <Skeleton className="w-32 h-8 rounded-2xl" />
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
       {/* 输入区 */}
