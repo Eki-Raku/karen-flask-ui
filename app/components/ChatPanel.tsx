@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import {Skeleton} from "~/components/ui/skeleton";
+import { Textarea } from "~/components/ui/textarea"
 
 interface Message {
   role: "user" | "system";
@@ -12,6 +13,7 @@ export default function ChatPanel() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // 初始化加载历史消息
   useEffect(() => {
@@ -22,6 +24,15 @@ export default function ChatPanel() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // 根据内容自动调整输入框高度
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const maxHeight = 200; // 限制最大高度（px），避免撑满屏幕
+    el.style.height = Math.min(el.scrollHeight, maxHeight) + "px";
+  }, [input]);
 
   // 获取历史消息
   const hisMsg = async () => {
@@ -88,9 +99,12 @@ export default function ChatPanel() {
     }
   };
 
-  // 回车发送
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") sendMessage();
+  // 回车发送（Shift+Enter 换行）
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
   };
 
   // 等待，用于模拟真实聊天
@@ -127,16 +141,15 @@ export default function ChatPanel() {
         <div ref={messagesEndRef} />
       </div>
       {/* 输入区 */}
-      <div className="flex gap-2 items-center border-t pt-3">
-        <input
-          className="flex-1 px-4 py-2 rounded border bg-background text-foreground outline-none focus:ring-2 focus:ring-blue-400 transition-all"
-          type="text"
-          placeholder="请输入你的问题..."
+      <div className="flex gap-2 items-end border-t pt-3">
+        <Textarea
+          ref={textareaRef}
+          className="flex-1 px-4 py-2 rounded border bg-background text-foreground outline-none focus:ring-2 focus:ring-blue-400 transition-all resize-none max-h-52 overflow-y-auto min-h-10"
+          placeholder=""
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={loading}
-          maxLength={200}
         />
         <Button
           onClick={sendMessage}
